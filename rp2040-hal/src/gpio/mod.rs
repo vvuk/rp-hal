@@ -304,6 +304,29 @@ impl<I: PinId, F: func::Function, P: PullType> Pin<I, F, P> {
         }
     }
 
+    /// Turn this pin into one with dynamically configurable pullup/pulldowns.
+    pub fn into_dyn_pull(self) -> Pin<I, F, DynPullType> {
+        Pin {
+            id: self.id,
+            function: self.function,
+            pull_type: self.pull_type.as_dyn(),
+        }
+    }
+
+    /// Turn this pin into one with a dynamically configurable function.
+    pub fn into_dyn_function(self) -> Pin<I, DynFunction, P> {
+        Pin {
+            id: self.id,
+            function: self.function.as_dyn(),
+            pull_type: self.pull_type,
+        }
+    }
+
+    /// Turn this pin into a fully dynamic one.
+    pub fn into_dyn(self) -> Pin<DynPinId, DynFunction, DynPullType> {
+        self.into_dyn_pin().into_dyn_pull().into_dyn_function()
+    }
+
     /// Get the pin's pull type.
     pub fn pull_type(&self) -> DynPullType {
         self.pull_type.as_dyn()
@@ -868,6 +891,7 @@ impl<F: func::Function, P: PullType> Pin<DynPinId, F, P> {
         }
     }
 }
+
 impl<I: PinId, P: PullType> Pin<I, DynFunction, P> {
     /// Try to set the pin's function.
     ///
@@ -888,6 +912,16 @@ impl<I: PinId, P: PullType> Pin<I, DynFunction, P> {
     pub fn function(&self) -> DynFunction {
         use func_sealed::Function;
         self.function.as_dyn()
+    }
+
+    /// Borrow this dynamic functioned pin as a pin with the concrete function `F2` and
+    /// concrete pull type `P2`.
+    pub fn try_borrow_as<F2>(&mut self) -> Result<&mut Pin<I, F2, P>, func::InvalidFunction>
+        where F2: func::Function + func_sealed::FunctionStatic
+    {
+        self.try_set_function(F2::as_dyn_static())?;
+
+        Ok(unsafe { &mut *(self as *mut Self as *mut Pin<I, F2, P>) })
     }
 }
 

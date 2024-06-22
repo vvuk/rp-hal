@@ -11,6 +11,10 @@ pub(crate) mod func_sealed {
         fn from(f: DynFunction) -> Self;
         fn as_dyn(&self) -> DynFunction;
     }
+
+    pub trait FunctionStatic {
+        fn as_dyn_static() -> DynFunction;
+    }
 }
 
 /// Type-level `enum` for pin function.
@@ -92,6 +96,12 @@ macro_rules! pin_func {
                     DynFunction::[<$fn>]
                 }
             }
+            impl func_sealed::FunctionStatic for [<Function $fn>] {
+                #[inline]
+                fn as_dyn_static() -> DynFunction {
+                    DynFunction::[<$fn>]
+                }
+            }
             $(
                 #[doc = "Alias to [`Function" $fn "`]."]
                 pub type [<Function $alias>] = [<Function $fn>];
@@ -118,9 +128,18 @@ impl<C: SioConfig> func_sealed::Function for FunctionSio<C> {
 }
 /// Alias to [`FunctionSio<Input>`].
 pub type FunctionSioInput = FunctionSio<SioInput>;
+impl func_sealed::FunctionStatic for FunctionSioInput {
+    fn as_dyn_static() -> DynFunction {
+        DynFunction::Sio(DynSioConfig::Input)
+    }
+}
 /// Alias to [`FunctionSio<Output>`].
 pub type FunctionSioOutput = FunctionSio<SioOutput>;
-
+impl func_sealed::FunctionStatic for FunctionSioOutput {
+    fn as_dyn_static() -> DynFunction {
+        DynFunction::Sio(DynSioConfig::Output)
+    }
+}
 /// Type-level `enum` for SIO configuration.
 pub trait SioConfig {
     #[allow(missing_docs)]
@@ -145,6 +164,7 @@ impl SioConfig for SioOutput {
 //==============================================================================
 
 /// Error type for invalid function conversion.
+#[derive(Debug)]
 pub struct InvalidFunction;
 
 /// Marker of valid pin -> function combination.

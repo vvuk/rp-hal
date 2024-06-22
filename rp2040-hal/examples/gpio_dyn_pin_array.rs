@@ -15,7 +15,7 @@
 #![no_std]
 #![no_main]
 
-use hal::gpio::{DynPinId, FunctionSioOutput, Pin, PullNone, PullUp};
+use hal::gpio::{DynPinId, DynPullType, FunctionSioInput, FunctionSioOutput, Pin, PullUp};
 // Ensure we halt the program on panic (if we don't mention this crate it won't
 // be linked)
 use panic_halt as _;
@@ -87,24 +87,17 @@ fn main() -> ! {
     // To put pins into an array we have to convert them to Dynamically Typed pins.
     // This means they'll carry their pin and bank numbers around with them at run time,
     // rather than relying on the Type of the pin to track that.
-    let mut pinarray: [Pin<DynPinId, FunctionSioOutput, PullNone>; 4] = [
-        pins.gpio2
-            .into_push_pull_output()
-            .into_pull_type()
-            .into_dyn_pin(),
-        pins.gpio3
-            .into_push_pull_output()
-            .into_pull_type()
-            .into_dyn_pin(),
-        pins.gpio4
-            .into_push_pull_output()
-            .into_pull_type()
-            .into_dyn_pin(),
-        pins.gpio5
-            .into_push_pull_output()
-            .into_pull_type()
-            .into_dyn_pin(),
+    let mut pinarray = [
+        pins.gpio2.into_dyn(),
+        pins.gpio3.into_dyn(),
+        pins.gpio4.into_dyn(),
+        pins.gpio5.into_dyn(),
     ];
+
+    // Because the pull type is DynPullType, we can dynamically set the pullup/pulldown
+    for pin in pinarray.iter_mut() {
+        pin.set_pull_type(DynPullType::Down);
+    }
 
     // Also set a pin as a dynamic input. We won't use this, it is just to demonstrate that
     // pins can have other functions and still be Dynamically typed.
@@ -118,14 +111,16 @@ fn main() -> ! {
     // Light one LED at a time. Start at GPIO2 and go through to GPIO5, then reverse.
     loop {
         for led in pinarray.iter_mut() {
-            led.set_high().unwrap();
+            let led_output = led.try_borrow_as::<FunctionSioOutput>().expect("Failed to borrow as SioOutput");
+            led_output.set_high().unwrap();
             timer.delay_ms(50);
-            led.set_low().unwrap();
-        }
-        for led in pinarray.iter_mut().rev() {
-            led.set_high().unwrap();
-            timer.delay_ms(50);
-            led.set_low().unwrap();
+
+            // instead of setting low, we're going to reconfigure as an input pin
+            let _ = led.try_borrow_as::<FunctionSioInput>().expect("Failed to borrow as SioInput");
+
+            // note you can't use led_output here again -- if you try, the borrow checker will complain about led_input because
+            // led is already borrowed.
+            //led_output.set_low().unwrap();
         }
     }
 }
